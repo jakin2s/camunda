@@ -14,12 +14,17 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.client.RestTemplate;
 
 import com.example.externalClient.Model.CamundaObject;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.camunda.bpm.client.backoff.ExponentialBackoffStrategy;
+import org.json.JSONObject;
 
 @Configuration
 public class HandlerConfiguration {
@@ -27,23 +32,14 @@ public class HandlerConfiguration {
 
 	@Bean
 	public void createTopicSubscriberHandler() {
-		ExponentialBackoffStrategy fetchTimer = new ExponentialBackoffStrategy(1000L,2, 1000L);
+		ExponentialBackoffStrategy fetchTimer = new ExponentialBackoffStrategy(500L, 2, 500L);
 		int maxTasksToFetchWithinOnRequest = 1;
-		
-		
-		ExternalTaskClient externalTaskClient = ExternalTaskClient
-				.create()
-				.baseUrl("http://localhost:8080/engine-rest")
-				.maxTasks(3)
-				.backoffStrategy(fetchTimer)
-				.maxTasks(maxTasksToFetchWithinOnRequest)
-				.build();
-		
 
-		externalTaskClient
-		 .subscribe("Bearbeitungszeit_protokollieren")
-		 .handler((externalTask, externalTaskService) -> {
-	
+		ExternalTaskClient externalTaskClient = ExternalTaskClient.create().baseUrl("http://localhost:8080/engine-rest")
+				.maxTasks(3).backoffStrategy(fetchTimer).build();
+
+		externalTaskClient.subscribe("Bearbeitungszeit_protokollieren").handler((externalTask, externalTaskService) -> {
+
 			logger.info("Bearbeitungszeit wird überprüft");
 			System.out.println("xxx");
 			try {
@@ -51,45 +47,38 @@ public class HandlerConfiguration {
 				boolean insureOrder = externalTask.getVariable("insureOrder");
 				int orderSize = externalTask.getVariable("orderSize");
 				int orderTime = externalTask.getVariable("orderTime");
-				long endeBearbeitungszeit = System.currentTimeMillis()/1000;
+				Long l = new Long(orderTime);
+				long endeBearbeitungszeit = System.currentTimeMillis() / 1000;
 				long differenceTime = endeBearbeitungszeit - orderTime;
-				
-				
-				
+
 				LocalDateTime dateTime = LocalDateTime.ofEpochSecond(differenceTime, 0, ZoneOffset.UTC);
 				DateTimeFormatter formatter = DateTimeFormatter.ofPattern("DD,MM,YYYY h:mm,a", Locale.GERMAN);
 				String finaleBearbeitungszeit = dateTime.format(DateTimeFormatter.ISO_DATE);
+
+				Map<String, Object> variables = new HashMap<>();
+				variables.put("differenceTimeValue", differenceTime);
+
+				logger.info("die Bearbeitungszeit beträgt " + differenceTime);
+
+				RestTemplate restTemplate = new RestTemplate();
+				CamundaObject camundaObjectClient = new CamundaObject(l, 5L,endeBearbeitungszeit);
+				JSONObject camundaJsonObject = new JSONObject(camundaObjectClient);
+				HttpHeaders headers = new HttpHeaders();
+				headers.setContentType(MediaType.APPLICATION_JSON);
 				
-				 Map<String, Object> variables = new HashMap<>();
-				 variables.put("differenceTimeValue", differenceTime);
-				 
-					 logger.info("die Bearbeitungszeit beträgt " + differenceTime );
-					 
-					 RestTemplate restTemplate = new RestTemplate();
-					 camundaJsonObject = new JSONObject();
-					    personJsonObject.put("id", 1);
-					    personJsonObject.put("name", "John");
-					
-					 HttpEntity<String> request = 
-						      new HttpEntity<String>(CamundaObject.toString(), headers);
-					 
-					 String personResultAsJsonStr = 
-						      restTemplate.postForObject(createPersonUrl, request, String.class);
-						    JsonNode root = objectMapper.readTree(personResultAsJsonStr);
-						    
-							return restTemplate.getForObject("http://localhost:8085", HandlerConfiguration.class);
-						
-					 
-					 externalTaskService.complete(externalTask, variables);
-				 
-				
-			
-			}catch(Exception e) {
-				externalTaskService.handleBpmnError(externalTask, externalTask.getId(), "Something went wrong!" +e);
+				logger.info("cumundaObject" + camundaJsonObject.toString());
+
+				final String url = "http://localhost:8086/camundaObject/";
+				HttpEntity<String> request = new HttpEntity<String>(camundaJsonObject.toString(), headers);
+				restTemplate.postForObject(url, request, String.class);
+				externalTaskService.complete(externalTask, variables);
+
+			} catch (Exception e) {
+				logger.error("Fehler: ", e);
+				externalTaskService.handleBpmnError(externalTask, externalTask.getId(), "Something went wrong!" + e);
 				return;
 			}
 		}).open();
-		
-		
+
 	}
 }
