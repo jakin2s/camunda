@@ -46,8 +46,8 @@ public class HandlerConfiguration {
 				int moneyValue = externalTask.getVariable("moneyValue");
 				boolean insureOrder = externalTask.getVariable("insureOrder");
 				int orderSize = externalTask.getVariable("orderSize");
-				int orderTime = externalTask.getVariable("orderTime");
-				Long l = new Long(orderTime);
+				int l = externalTask.getVariable("orderTime");
+				Long orderTime = new Long(l);
 				long endeBearbeitungszeit = System.currentTimeMillis() / 1000;
 				long differenceTime = endeBearbeitungszeit - orderTime;
 
@@ -61,7 +61,7 @@ public class HandlerConfiguration {
 				logger.info("die Bearbeitungszeit beträgt " + differenceTime);
 
 				RestTemplate restTemplate = new RestTemplate();
-				CamundaObject camundaObjectClient = new CamundaObject(l, 5L,endeBearbeitungszeit);
+				CamundaObject camundaObjectClient = new CamundaObject(orderTime,endeBearbeitungszeit,differenceTime);
 				JSONObject camundaJsonObject = new JSONObject(camundaObjectClient);
 				HttpHeaders headers = new HttpHeaders();
 				headers.setContentType(MediaType.APPLICATION_JSON);

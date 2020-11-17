@@ -1,24 +1,17 @@
 package com.example.externalClient.Model;
 
 public class CamundaObject {
-	
 
-	private final long durchlaufzeit;
 	private final long startzeit;
 	private final long endzeit;
-	
-	
-	
-	public CamundaObject( long startzeit, long endzeit, long durchlaufzeit) {
-		
-		this.durchlaufzeit = durchlaufzeit;
-		this.endzeit = endzeit;
-		this.startzeit = startzeit;
-	}
+	private final long durchlaufzeit;
 	
 
-	public long getDurchlaufzeit() {
-		return durchlaufzeit;
+	public CamundaObject( long startzeit, long endzeit, long durchlaufzeit) {
+
+		this.endzeit = endzeit;
+		this.startzeit = startzeit;
+		this.durchlaufzeit = durchlaufzeit;
 	}
 
 	public long getStartzeit() {
@@ -27,6 +20,10 @@ public class CamundaObject {
 
 	public long getEndzeit() {
 		return endzeit;
+	}
+
+	public long getDurchlaufzeit() {
+		return durchlaufzeit;
 	}
 	
 }
