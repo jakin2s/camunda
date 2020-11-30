@@ -68,7 +68,7 @@ public class HandlerConfiguration {
 				
 				logger.info("cumundaObject" + camundaJsonObject.toString());
 
-				final String url = "http://localhost:8086/camundaObject/";
+				final String url = "http://localhost:8093/camundaObject/monitoring";
 				HttpEntity<String> request = new HttpEntity<String>(camundaJsonObject.toString(), headers);
 				restTemplate.postForObject(url, request, String.class);
 				externalTaskService.complete(externalTask, variables);
@@ -80,5 +80,9 @@ public class HandlerConfiguration {
 			}
 		}).open();
 
+		externalTaskClient.subscribe("Startzeit_festlegen").handler((externalTask, externalTaskService) -> {
+				externalTaskService.complete(externalTask);
+
+		}).open();
 	}
 }
