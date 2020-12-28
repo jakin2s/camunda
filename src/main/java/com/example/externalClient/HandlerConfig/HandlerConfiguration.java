@@ -1,4 +1,4 @@
-package com.example.externalClient;
+package com.example.externalClient.HandlerConfig;
 
 import java.time.LocalDateTime;
 
@@ -7,8 +7,12 @@ import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.*;
 
+import lombok.extern.slf4j.Slf4j;
 import org.camunda.bpm.client.ExternalTaskClient;
+import org.camunda.bpm.client.task.ExternalTask;
+import org.camunda.bpm.client.task.impl.ExternalTaskImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
@@ -16,20 +20,16 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.client.RestTemplate;
 
 import com.example.externalClient.Model.CamundaObject;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.camunda.bpm.client.backoff.ExponentialBackoffStrategy;
 import org.json.JSONObject;
 
 @Configuration
+@Slf4j
 public class HandlerConfiguration {
-	private final Logger logger = LoggerFactory.getLogger(HandlerConfiguration.class);
-
 	@Bean
 	public void createTopicSubscriberHandler() {
 		ExponentialBackoffStrategy fetchTimer = new ExponentialBackoffStrategy(500L, 2, 500L);
@@ -40,16 +40,18 @@ public class HandlerConfiguration {
 
 		externalTaskClient.subscribe("Bearbeitungszeit_protokollieren").handler((externalTask, externalTaskService) -> {
 
-			logger.info("Bearbeitungszeit wird überprüft");
-			System.out.println("xxx");
+			log.info("Bearbeitungszeit wird überprüft");
 			try {
-				int moneyValue = externalTask.getVariable("moneyValue");
-				boolean insureOrder = externalTask.getVariable("insureOrder");
-				int orderSize = externalTask.getVariable("orderSize");
-				int l = externalTask.getVariable("orderTime");
-				Long orderTime = new Long(l);
+				Double l = ( externalTask.getVariable("orderTime"));
+				Long orderTime = new Long(l.intValue());
 				long endeBearbeitungszeit = System.currentTimeMillis() / 1000;
-				long differenceTime = endeBearbeitungszeit - orderTime;
+				long differenceTime = (long) (endeBearbeitungszeit - orderTime);
+				long durchlaufzeit_sec = TimeUnit.SECONDS.convert(differenceTime, TimeUnit.SECONDS);
+				long durchlaufzeit_ms = TimeUnit.SECONDS.convert(differenceTime, TimeUnit.MILLISECONDS);
+				long durchlaufzeit_nano = TimeUnit.SECONDS.convert(differenceTime, TimeUnit.NANOSECONDS);
+
+
+
 
 				LocalDateTime dateTime = LocalDateTime.ofEpochSecond(differenceTime, 0, ZoneOffset.UTC);
 				DateTimeFormatter formatter = DateTimeFormatter.ofPattern("DD,MM,YYYY h:mm,a", Locale.GERMAN);
@@ -58,15 +60,15 @@ public class HandlerConfiguration {
 				Map<String, Object> variables = new HashMap<>();
 				variables.put("differenceTimeValue", differenceTime);
 
-				logger.info("die Bearbeitungszeit beträgt " + differenceTime);
+				log.info("die Bearbeitungszeit beträgt " + differenceTime);
 
 				RestTemplate restTemplate = new RestTemplate();
-				CamundaObject camundaObjectClient = new CamundaObject(orderTime,endeBearbeitungszeit,differenceTime);
+				CamundaObject camundaObjectClient = new CamundaObject(orderTime,endeBearbeitungszeit,durchlaufzeit_nano,durchlaufzeit_ms,durchlaufzeit_sec);
 				JSONObject camundaJsonObject = new JSONObject(camundaObjectClient);
 				HttpHeaders headers = new HttpHeaders();
 				headers.setContentType(MediaType.APPLICATION_JSON);
-				
-				logger.info("cumundaObject" + camundaJsonObject.toString());
+
+				log.info("cumundaObject" + camundaJsonObject.toString());
 
 				final String url = "http://localhost:8093/camundaObject/monitoring";
 				HttpEntity<String> request = new HttpEntity<String>(camundaJsonObject.toString(), headers);
@@ -74,7 +76,7 @@ public class HandlerConfiguration {
 				externalTaskService.complete(externalTask, variables);
 
 			} catch (Exception e) {
-				logger.error("Fehler: ", e);
+				log.error("Fehler: ", e);
 				externalTaskService.handleBpmnError(externalTask, externalTask.getId(), "Something went wrong!" + e);
 				return;
 			}
@@ -82,7 +84,6 @@ public class HandlerConfiguration {
 
 		externalTaskClient.subscribe("Startzeit_festlegen").handler((externalTask, externalTaskService) -> {
 				externalTaskService.complete(externalTask);
-
 		}).open();
 	}
 }
